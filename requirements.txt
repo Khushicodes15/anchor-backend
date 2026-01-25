@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+firebase-admin
+python-dotenv
+python-multipart
+azure-ai-textanalytics
+azure-ai-contentsafety
+azure-core
+google-genai
