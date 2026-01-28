@@ -31,7 +31,7 @@ if not firebase_admin._apps:
     firebase_admin.initialize_app(
         cred,
         {
-            "storageBucket": "anchor-8482f.appspot.com"
+            "storageBucket": os.getenv("FIREBASE_STORAGE_BUCKET")
         }
     )
 

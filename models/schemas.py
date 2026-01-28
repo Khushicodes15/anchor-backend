@@ -32,17 +32,21 @@ class JournalOut(BaseModel):
 # --------------------
 # Safety Plan Schemas
 # --------------------
-class SafetyPlanCreate(BaseModel):
-    plan_name: Optional[str] = None  # from auth-firebase
-    steps: Optional[List[str]] = [] # from auth-firebase
-
-class SafetyPlanOut(SafetyPlanCreate):
-    id: Optional[str] = None
-
 class SafeContact(BaseModel):
     name: str
     phone: Optional[str] = None
     email: Optional[str] = None
+    
+class SafetyPlanCreate(BaseModel):
+    triggers: Optional[List[str]] = []
+    coping_strategies: Optional[List[str]] = []
+    safe_contacts: Optional[List[SafeContact]] = []
+    reason_to_live: Optional[str] = ""
+
+class SafetyPlanOut(SafetyPlanCreate):
+    id: Optional[str] = None
+
+
 
 class ReasonToLive(BaseModel):
     text: Optional[str] = None
