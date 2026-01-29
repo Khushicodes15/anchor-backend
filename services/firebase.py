@@ -7,25 +7,32 @@ import json
 if not firebase_admin._apps:
     cred = None
 
-    #ENV variable (used in deployment)
-    raw_env = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
+    # 1️⃣ Render Secret File (production)
+    render_secret_path = "/etc/secrets/firebase-service-account.json"
+    if os.path.exists(render_secret_path):
+        cred = credentials.Certificate(render_secret_path)
 
-    if raw_env:
-        try:
-            service_account_info = json.loads(raw_env)
-            cred = credentials.Certificate(service_account_info)
-        except Exception as e:
-            cred= None
+    # 2️⃣ ENV variable (deployment / fallback)
+    if cred is None:
+        raw_env = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
+        if raw_env:
+            try:
+                service_account_info = json.loads(raw_env)
+                cred = credentials.Certificate(service_account_info)
+            except Exception:
+                cred = None
 
-    #Fallback to local file (used only locally)
+    # 3️⃣ Local file (local development only)
     if cred is None:
         try:
             cred = credentials.Certificate("firebase-service-account.json")
         except Exception as e:
             raise RuntimeError(
                 "Firebase credentials not found.\n"
-                "Either set FIREBASE_SERVICE_ACCOUNT_JSON env var "
-                "or provide firebase-service-account.json locally."
+                "Provide one of:\n"
+                "- Render secret file\n"
+                "- FIREBASE_SERVICE_ACCOUNT_JSON env var\n"
+                "- firebase-service-account.json locally"
             ) from e
 
     firebase_admin.initialize_app(
