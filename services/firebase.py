@@ -18,27 +18,16 @@ if not firebase_admin._apps:
             cred= None
 
     #Fallback to local file (used only locally)
-    raw_env = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
+    if cred is None:
+        try:
+            cred = credentials.Certificate("firebase-service-account.json")
+        except Exception as e:
+            raise RuntimeError(
+                "Firebase credentials not found.\n"
+                "Either set FIREBASE_SERVICE_ACCOUNT_JSON env var "
+                "or provide firebase-service-account.json locally."
+            ) from e
 
-    if not raw_env:
-        raise RuntimeError(
-            "FIREBASE_SERVICE_ACCOUNT_JSON is not set. "
-            "This is required in production."
-        )
-    try:
-        service_account_info = json.loads(raw_env)
-        cred = credentials.Certificate(service_account_info)
-    except Exception as e:
-        raise RuntimeError(
-            "Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON. "
-            "Ensure it is valid single-line JSON."
-        ) from e
-    firebase_admin.initialize_app(
-        cred,
-        {
-            "storageBucket": os.getenv("FIREBASE_STORAGE_BUCKET")
-        }
-    )
     firebase_admin.initialize_app(
         cred,
         {
