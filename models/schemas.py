@@ -8,9 +8,11 @@ from datetime import datetime
 class JournalCreate(BaseModel):
     title: Optional[str] = None
     content: str
+    session_id: Optional[str] = None   
 
 class JournalOut(BaseModel):
     id: str
+    session_id: Optional[str] = None  
     title: Optional[str]
     content: str
     created_at: datetime
@@ -46,8 +48,6 @@ class SafetyPlanCreate(BaseModel):
 class SafetyPlanOut(SafetyPlanCreate):
     id: Optional[str] = None
 
-
-
 class ReasonToLive(BaseModel):
     text: Optional[str] = None
     media_url: Optional[str] = None
@@ -57,6 +57,7 @@ class SafetyPlan(BaseModel):
     coping_strategies: Optional[List[str]] = []
     safe_contacts: Optional[List[SafeContact]] = []
     reason_to_live: Optional[ReasonToLive] = None
+
 class CommunityStoryCreate(BaseModel):
     story: str
     tags: List[str] = []
