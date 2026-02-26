@@ -15,18 +15,20 @@ def create_journal(
 ):
     db = get_db()
     created_at = datetime.utcnow()
-
     ai_output = run_journal_ai(journal.content)
 
-    # 🔥 create document first so we can use its id as session anchor
     doc_ref = db.collection("journals").document()
-
     session_id = journal.session_id or doc_ref.id
+
+    # ✅ Use actual message content as title, not hardcoded string
+    title = journal.title or ""
+    if not title or title.strip().lower() == "journal reflection":
+        title = (journal.content or "")[:40]
 
     journal_data = {
         "uid": uid,
         "session_id": session_id,
-        "title": journal.title,
+        "title": title,
         "content": journal.content,
         "created_at": created_at,
         "sentiment": ai_output["sentiment"],
@@ -41,25 +43,7 @@ def create_journal(
 
     doc_ref.set(journal_data)
 
-    return {
-        "id": doc_ref.id,
-        "session_id": session_id,
-        **journal_data
-    }
-
-
-@router.get("/")
-def get_journals(uid: str = Depends(verify_firebase_token)):
-    db = get_db()
-
-    docs = (
-        db.collection("journals")
-        .where("uid", "==", uid)
-        .order_by("created_at")
-        .stream()
-    )
-
-    return [{"id": d.id, **d.to_dict()} for d in docs]
+    return {"id": doc_ref.id, "session_id": session_id, **journal_data}
 
 
 @router.get("/sessions")
@@ -69,26 +53,35 @@ def get_sessions(uid: str = Depends(verify_firebase_token)):
     docs = (
         db.collection("journals")
         .where("uid", "==", uid)
-        .order_by("created_at")
         .stream()
     )
 
-    seen = set()
-    sessions = []
-
+    seen: dict = {}
     for doc in docs:
         data = doc.to_dict()
+
+        # Legacy docs with no session_id: use doc.id as session key
         sid = data.get("session_id") or doc.id
+        created_at = data.get("created_at")
 
         if sid not in seen:
-            seen.add(sid)
-            sessions.append({
+            # ✅ Treat "Journal reflection" as empty — fall back to content
+            stored_title = data.get("title", "")
+            if not stored_title or stored_title.strip().lower() in ("journal reflection", ""):
+                stored_title = data.get("content", "")
+            seen[sid] = {
                 "session_id": sid,
-                "title": data.get("title") or data.get("content", "")[:40],
-                "created_at": data.get("created_at"),
-            })
+                "title": stored_title[:40],
+                "created_at": created_at,
+            }
+        else:
+            # Keep earliest created_at as session anchor
+            existing = seen[sid]["created_at"]
+            if existing and created_at and created_at < existing:
+                seen[sid]["created_at"] = created_at
 
-    sessions.reverse()
+    sessions = list(seen.values())
+    sessions.sort(key=lambda s: s["created_at"] or datetime.min, reverse=True)
     return sessions
 
 
@@ -99,12 +92,39 @@ def get_session_messages(
 ):
     db = get_db()
 
+    # Modern: query by session_id field
     docs = (
         db.collection("journals")
         .where("uid", "==", uid)
         .where("session_id", "==", session_id)
-        .order_by("created_at")
         .stream()
     )
 
-    return [{"id": d.id, **d.to_dict()} for d in docs]
+    results = [{"id": doc.id, **doc.to_dict()} for doc in docs]
+
+    # ✅ Legacy fallback: old docs had no session_id stored,
+    # get_sessions used doc.id as the key — fetch that single doc directly
+    if not results:
+        doc = db.collection("journals").document(session_id).get()
+        if doc.exists:
+            data = doc.to_dict()
+            if data.get("uid") == uid:
+                results = [{"id": doc.id, **data}]
+
+    results.sort(key=lambda x: x.get("created_at") or datetime.min)
+    return results
+
+
+@router.get("/")
+def get_journals(uid: str = Depends(verify_firebase_token)):
+    db = get_db()
+
+    docs = (
+        db.collection("journals")
+        .where("uid", "==", uid)
+        .stream()
+    )
+
+    results = [{"id": doc.id, **doc.to_dict()} for doc in docs]
+    results.sort(key=lambda x: x.get("created_at") or datetime.min)
+    return results
